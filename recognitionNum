@@ -1,0 +1,215 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Jun  5 20:41:52 2018
+
+@author: snake
+"""
+
+import os
+import struct
+import numpy as np
+
+#第一部分：读取数据
+
+#load training dataset from bi-format data
+def load_mnist(path, kind='train'):
+    """Load MNIST data from `path`"""
+    labels_path = os.path.join(path,
+                               '%s-labels.idx1-ubyte'
+                               % kind)
+    images_path = os.path.join(path,
+                               '%s-images.idx3-ubyte'
+                               % kind)
+    with open(labels_path, 'rb') as lbpath:
+        magic, n = struct.unpack('>II',
+                                 lbpath.read(8))
+        labels = np.fromfile(lbpath,
+                             dtype=np.uint8)
+
+    with open(images_path, 'rb') as imgpath:
+        magic, num, rows, cols = struct.unpack('>IIII',
+                                               imgpath.read(16))
+        images = np.fromfile(imgpath,
+                             dtype=np.uint8).reshape(len(labels), 784)
+
+    return images, labels
+
+
+images_train_int8,labels_train = load_mnist('F:\AI\Mnist',kind = 'train')
+
+
+#load test dataset from bi-format data
+
+images_test_int8,labels_test = load_mnist('F:\AI\Mnist',kind = 't10k')
+
+
+
+#预处理/ 特征工程
+#进行图像的二值化，阈值设定为50 ， 
+
+# 图像当中像素点数值大于50的，为1，小于50的，转化为0
+
+#osto
+
+thresh = 50
+
+images_train =  (images_train_int8 >= thresh) * 1
+images_test =  (images_test_int8 >= thresh) * 1
+
+
+#对二值化/原始图像，进行可视化
+import matplotlib.pyplot as plt
+
+fig , ax = plt.subplots(
+    nrows = 2,
+    ncols = 5,
+    sharex = True,
+    sharey = True, )
+        
+        
+ax = ax.flatten()
+
+#从一个循环当中拿去label 1- 10的10个数字，用来展示
+for i in range(10):
+    img = images_train_int8[labels_train == i][0].reshape(28, 28)
+    ax[i].imshow(img, cmap = 'Greys',interpolation = 'nearest')
+    
+ax[0].set_xticks([])
+ax[0].set_yticks([])
+plt.tight_layout()
+plt.show()
+
+#指定模型 训练数据
+
+#导入sklearn当中的随机森林模型
+from sklearn.ensemble import RandomForestClassifier
+
+#使用sklearn的时候
+#1 ,指定一个模型
+#2，喂数据，根据输入数据，在已选择的模型基础上进行训练
+#3，使用训练好的模型进行预测
+
+
+#指定需要使用的模型（还没有涉及到数据）
+model = RandomForestClassifier(n_estimators = 50, n_jobs = -1 )
+
+
+import datetime 
+starttime = datetime.datetime.now()
+#喂数据，使用训练集的数据进行模型的训练
+
+model.fit(images_train, labels_train)
+
+endtime = datetime.datetime.now()
+time_train = endtime - starttime
+print(time_train)
+
+#使用模型进行预测，读取外置图片
+#使用训练好的模型进行预测
+#model.predict()
+
+import cv2
+#使用imerad函数读取图像
+im = cv2.imread('F:\\AI\\4\\AI_photo\\0.PNG')
+
+#将图像转化为灰度图像
+im_gray= cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+
+#重置图像大小
+im_final = cv2.resize(im_gray , (28,28))
+
+thresh = 30
+
+im_bi = (im_final >= thresh) * 1
+im_vec = im_bi.flatten()
+im_vec = im_vec.reshape(1, -1)
+
+
+
+
+#使用训练好的模型进行预测
+prediction = model.predict(im_vec)
+
+import cv2
+
+print('the number in the image is ' + str(prediction))
+cv2.imshow('666', img)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+
+#模型持久化部分
+
+#导入sklearn中的模型持久化工具
+from sklearn.externals import joblib
+
+#指定一个名称
+filename = 'model.m'
+
+#调用dump函数
+joblib.dump(model,filename)
+
+#调用已经存储的模型
+model = joblib.load('model.m')
+
+#评估
+#预测测试集当中所有数据的结果
+#手动实现 准确率统计
+prediction_10000 = model.predict(images_test)
+
+ac = (labels_test == prediction_10000)
+
+count = 0 
+
+for i in range(len(ac)):
+    if ac[i] == True:
+        count= count + 1 
+accu = count / len(ac)
+print(accu)
+
+#导入统计准确率的方法
+from sklearn.metrics import accuracy_score
+
+#调用工具进行准确率计算
+accuracy_sk = accuracy_score(labels_test, prediction_10000)
+print(accuracy_sk)
+
+#调用sklearn进行召回率计算
+from sklearn.metrics import recall_score
+recall_sk = recall_score(labels_test, prediction_10000, average = 'macro')
+print(recall_sk)
+
+#F1-score
+from sklearn.metrics import f1_score
+f1_score_sk = f1_score(labels_test, prediction_10000, average = 'macro')
+print(f1_score_sk)
+
+
+#生成一个模型评估报告
+from sklearn.metrics import classification_report
+
+#数据集当中包含的label
+labels = [0,1,2,3,4,5,6,7,8,9]
+
+#给每个类别起一个名称
+classes = ['class 0', 
+           'class 1',
+           'class 2',
+           'class 3',
+           'class 4',
+           'class 5',
+           'class 6',
+           'class 7',
+           'class 8',
+           'class 9'
+           ]
+
+#使用函数生成总体的报告
+print(classification_report(labels_test,
+                           prediction_10000,
+                           target_names = classes,
+                           labels = labels,
+                           digits = 4)) 
+                         
+                         
+#来着NUMO老师的代码
+
