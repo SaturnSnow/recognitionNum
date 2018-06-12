@@ -211,5 +211,5 @@ print(classification_report(labels_test,
                            digits = 4)) 
                          
                          
-#来着NUMO老师的代码
+#来着NUMO老师的代码，请勿用于商业
 
